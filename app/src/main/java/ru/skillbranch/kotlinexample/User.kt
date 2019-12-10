@@ -11,6 +11,7 @@ class User private constructor(
     private val lastName: String?,
     email: String? = null,
     rawPhone: String? = null,
+    saltFromSourceData: String? = null,
     meta: Map<String, Any>? = null
 ) {
     val userInfo: String
@@ -27,7 +28,7 @@ class User private constructor(
     private var phone: String? = null
         set(value) {
             field = value?.replace("[^+\\d]".toRegex(), "")?.also {
-                if (it.length != 12) throw IllegalArgumentException("Enter a valid phone number starting with a + and containing 11 digits")
+                require(it.matches("^[+][\\d]{11}\$".toRegex())) { "Enter a valid phone number starting with a + and containing 11 digits" }
             }
 
         }
@@ -40,7 +41,7 @@ class User private constructor(
         get() = _login!!
 
     private val salt: String by lazy {
-        ByteArray(16).also { SecureRandom().nextBytes(it) }.toString()
+        saltFromSourceData ?: ByteArray(16).also { SecureRandom().nextBytes(it) }.toString()
     }
 
     private lateinit var passwordHash: String
@@ -71,6 +72,19 @@ class User private constructor(
         passwordHash = encrypt(code)
         accessCode = code
         sendAccessCodeToUser(rawPhone, code)
+    }
+
+    //for csv
+    constructor(
+        firstName: String,
+        lastName: String?,
+        email: String?,
+        salt: String,
+        passwordHash: String,
+        rawPhone: String?
+    ): this(firstName, lastName, email = email, rawPhone = rawPhone, saltFromSourceData = salt, meta = mapOf("src" to "csv")) {
+        println("Secondary csv constructor")
+        this.passwordHash = passwordHash
     }
 
     init {
@@ -147,6 +161,21 @@ class User private constructor(
                 )
                 else -> throw IllegalArgumentException("Email or phone must be not null or blank")
             }
+        }
+
+        fun importUser(
+            fullName: String? = null,
+            email: String? = null,
+            fullPasswordData: String? = null,
+            rawPhone: String? = null
+        ) : User {
+            fullName ?: throw IllegalArgumentException("Full name must be not null")
+            fullPasswordData ?: throw IllegalArgumentException("Password data must be not null")
+
+            val (firstName: String, lastName: String?) = fullName.fullNameToPair()
+            val (salt: String, passwordHash: String) = fullPasswordData.split(":")
+
+            return User(firstName, lastName, email, salt, passwordHash, rawPhone)
         }
 
         private fun String.fullNameToPair(): Pair<String, String?> {

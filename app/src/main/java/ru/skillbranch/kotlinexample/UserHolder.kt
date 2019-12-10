@@ -10,16 +10,16 @@ object UserHolder {
     ): User {
         return User.makeUser(fullName, email = email, password = password)
             .also { user ->
-                if (map.containsKey(user.login)) throw IllegalArgumentException("A user with this email already exists")
-                else map[user.login] = user
+                require(!map.containsKey(user.login)) { "A user with this email already exists" }
+                map[user.login] = user
             }
     }
 
     fun registerUserByPhone(fullName: String, rawPhone: String): User {
         return User.makeUser(fullName, phone = rawPhone)
             .also { user ->
-                if (map.containsKey(user.login)) throw IllegalArgumentException("A user with this phone already exists")
-                else map[user.login] = user
+                require(!map.containsKey(user.login)) { "A user with this phone already exists" }
+                map[user.login] = user
             }
     }
 
@@ -40,6 +40,16 @@ object UserHolder {
     }
 
     fun importUsers(list: List<String>): List<User> {
-
+        return list.map {
+            val (fullName: String?, email: String?, fullPasswordData: String?, rawPhone: String?) =
+                it.split(";").map { item ->
+                    if (item.isEmpty()) null else item
+                }
+            User.importUser(fullName, email, fullPasswordData, rawPhone)
+                .also { user ->
+                    require(!map.containsKey(user.login)) { "A user with this data already exists" }
+                    map[user.login] = user
+                }
+        }
     }
 }
