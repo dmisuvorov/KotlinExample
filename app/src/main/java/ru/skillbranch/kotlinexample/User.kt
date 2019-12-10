@@ -6,7 +6,7 @@ import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
 
-class User(
+class User private constructor(
     private val firstName: String,
     private val lastName: String?,
     email: String? = null,
@@ -16,21 +16,24 @@ class User(
     val userInfo: String
     private val fullName: String
         get() = listOfNotNull(firstName, lastName)
-            .joinToString { " " }
+            .joinToString(" ")
             .capitalize()
 
     private val initials: String
         get() = listOfNotNull(firstName, lastName)
             .map { it.first().toUpperCase() }
-            .joinToString { " " }
+            .joinToString(" ")
 
     private var phone: String? = null
         set(value) {
-            field = value?.replace("[^+\\d]".toRegex(), "")
+            field = value?.replace("[^+\\d]".toRegex(), "")?.also {
+                if (it.length != 12) throw IllegalArgumentException("Enter a valid phone number starting with a + and containing 11 digits")
+            }
+
         }
 
     private var _login: String? = null
-    private var login: String
+    var login: String
         set(value) {
             _login = value?.toLowerCase()
         }
@@ -54,6 +57,7 @@ class User(
         password: String
     ) : this(firstName, lastName, email = email, meta = mapOf("auth" to "password")) {
         println("Secondary mail constructor")
+        passwordHash = encrypt(password)
     }
 
     //for phone
@@ -75,6 +79,9 @@ class User(
         check(!firstName.isBlank()) { "FirstName must be not blank" }
         check(email.isNullOrBlank() || rawPhone.isNullOrBlank()) { "Email or phone must be not blank" }
 
+        phone = rawPhone
+        login = email ?: phone!!
+
         userInfo = """
             firstName: $firstName
             lastName: $lastName
@@ -87,9 +94,16 @@ class User(
         """.trimIndent()
     }
 
+    fun checkPassword(pass: String) = encrypt(pass) == passwordHash
+
+    fun changePassword(oldPass: String, newPass: String) {
+        if (checkPassword(oldPass)) passwordHash = encrypt(newPass)
+        else throw IllegalArgumentException("The entered password does not match the current password")
+    }
+
     private fun encrypt(password: String): String = salt.plus(password).md5()
 
-    private fun generateAccessCode(): String {
+    fun generateAccessCode(): String {
         val possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
         return StringBuilder().apply {
@@ -112,6 +126,44 @@ class User(
         val digest = md.digest(toByteArray()) //16 byte
         val hexString = BigInteger(1, digest).toString(16)
         return hexString.padStart(32, '0')
+    }
+
+    companion object Factory {
+        fun makeUser(
+            fullName: String,
+            email: String? = null,
+            password: String? = null,
+            phone: String? = null
+        ): User {
+            val (firstName: String, lastName: String?) = fullName.fullNameToPair()
+
+            return when {
+                !phone.isNullOrBlank() -> User(firstName, lastName, phone)
+                !email.isNullOrBlank() && !password.isNullOrBlank() -> User(
+                    firstName,
+                    lastName,
+                    email,
+                    password
+                )
+                else -> throw IllegalArgumentException("Email or phone must be not null or blank")
+            }
+        }
+
+        private fun String.fullNameToPair(): Pair<String, String?> {
+            return this.split(" ")
+                .filter { it.isNotBlank() }
+                .run {
+                    when (size) {
+                        1 -> first() to null
+                        2 -> first() to last()
+                        else -> throw IllegalArgumentException(
+                            "FullName must contain only first name and last name, " +
+                                    "current split result ${this@fullNameToPair}"
+                        )
+                    }
+                }
+        }
+
     }
 
 }
