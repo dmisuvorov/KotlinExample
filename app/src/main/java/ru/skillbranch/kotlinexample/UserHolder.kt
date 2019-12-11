@@ -19,7 +19,7 @@ object UserHolder {
         return User.makeUser(fullName, phone = rawPhone)
             .also { user ->
                 require(!map.containsKey(user.login)) { "A user with this phone already exists" }
-                map[user.login] = user
+                map[rawPhone] = user
             }
     }
 

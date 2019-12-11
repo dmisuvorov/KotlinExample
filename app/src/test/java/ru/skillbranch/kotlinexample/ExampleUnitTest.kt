@@ -110,19 +110,19 @@ class ExampleUnitTest {
     @Test
     fun login_user_by_phone_success() {
         val holder = UserHolder
-        val user = holder.registerUserByPhone("John Doe", "+7 (917) 971-11-11")
+        val user = holder.registerUserByPhone("John", "+7 9179710000")
         val expectedInfo = """
             firstName: John
-            lastName: Doe
-            login: +79179711111
-            fullName: John Doe
-            initials: J D
+            lastName: null
+            login: +79179710000
+            fullName: John
+            initials: J
             email: null
-            phone: +79179711111
+            phone: +79179710000
             meta: {auth=sms}
         """.trimIndent()
 
-        val successResult = holder.loginUser("+79179711111", user.accessCode!!)
+        val successResult = holder.loginUser("+7 9179710000", user.accessCode!!)
 
         Assert.assertEquals(expectedInfo, successResult)
     }
